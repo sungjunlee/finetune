@@ -1,12 +1,11 @@
 import functools
 
 import tensorflow as tf
+from tensorflow.contrib.crf import crf_log_likelihood
 
 from finetune.transformer import dropout, embed, block, attn, norm
 from finetune.utils import shape_list, merge_leading_dims
 from finetune.recompute_grads import recompute_grad
-from finetune.crf import crf_log_likelihood
-# from tensorflow.contrib.crf import crf_log_likelihood
 
 
 def perceptron(x, ny, config, w_init=None, b_init=None):
@@ -244,6 +243,15 @@ def regressor(hidden, targets, n_targets, dropout_placeholder, config, train=Fal
         }
 
 
+def class_reweighting(class_weights):
+    @tf.custom_gradient
+    def custom_grad(logits):
+        def grad(g):
+            return g * class_weights
+        return tf.identity(logits), grad
+    return custom_grad
+
+
 def sequence_labeler(hidden, targets, n_targets, dropout_placeholder, config, train=False, reuse=None, **kwargs):
     """
     An Attention based sequence labeler model. Takes the output of the pre-trained model, applies an additional
@@ -283,13 +291,16 @@ def sequence_labeler(hidden, targets, n_targets, dropout_placeholder, config, tr
 
         transition_params = tf.get_variable("Transition_matrix", shape=[n_targets, n_targets])
 
+        class_weights = kwargs.get('class_weights')
+        if class_weights is not None:
+            logits = class_reweighting(class_weights)(logits)
+        
         if train:
             log_likelihood, _ = crf_log_likelihood(
                 logits, 
                 targets,
                 kwargs.get('max_length') * tf.ones(tf.shape(targets)[0]),
-                transition_params=transition_params,
-                class_weights=kwargs.get('class_weights')
+                transition_params=transition_params
             )
         else:
             log_likelihood = tf.constant(0.)

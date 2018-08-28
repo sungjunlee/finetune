@@ -15,7 +15,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import pandas as pd
 import numpy as np
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, recall_score
 
 from finetune import Classifier
 from finetune.datasets import generic_download
@@ -109,30 +109,40 @@ class TestClassifier(unittest.TestCase):
 
         model = Classifier(config=self.default_config())
         train_sample = self.dataset.sample(n=self.n_sample)
-        valid_sample = self.dataset.sample(n=self.n_sample)
-
+        valid_sample = self.dataset.sample(n=(2 * self.n_sample))
+        
         with self.assertRaises(FinetuneError):
             model.fit(train_sample.Text, train_sample.Target[:1])
+        
+        model.fit(train_sample.Text.values, train_sample.Target.values)
 
-        model.fit(train_sample.Text, train_sample.Target)
-
-        predictions = model.predict(valid_sample.Text)
+        predictions = model.predict(valid_sample.Text.values)
         for prediction in predictions:
             self.assertIsInstance(prediction, (np.int, np.int64))
 
-        probabilities = model.predict_proba(valid_sample.Text)
+        probabilities = model.predict_proba(valid_sample.Text.values)
         for proba in probabilities:
             self.assertIsInstance(proba, dict)
+
+        # testing class weights
+        recall = recall_score(valid_sample.Target.values, predictions, pos_label=1)
+        model = Classifier(config=self.default_config(class_weights={'1': 100}))
+        model.fit(train_sample.Text.values, train_sample.Target.values)
+        predictions = model.predict(valid_sample.Text.values)
+        new_recall = recall_score(valid_sample.Target.values, predictions, pos_label=1)
+        self.assertTrue(new_recall >= recall)
+
 
     def test_fit_predict_batch_size_1(self):
         """
         Ensure training is possible with batch size of 1
         """
-        model = Classifier(config=self.default_config())
+        model = Classifier(config=self.default_config(batch_size=1))
         train_sample = self.dataset.sample(n=self.n_sample)
         valid_sample = self.dataset.sample(n=self.n_sample)
         model.fit(train_sample.Text.values, train_sample.Target.values)
         model.predict(valid_sample.Text.values)
+
 
     def test_save_load(self):
         """
