@@ -198,7 +198,7 @@ class BaseModel(object, metaclass=ABCMeta):
         }
 
     def finetune(self, Xs, Y=None, batch_size=None):
-        if len(Xs) != len(Y):
+        if Y is not None and len(Xs) != len(Y):
             raise FinetuneError(
                 "Mismatch between number of examples ({}) and number of targets ({}) provided.".format(
                     len(Xs),
