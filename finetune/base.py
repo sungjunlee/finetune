@@ -560,7 +560,7 @@ class BaseModel(object, metaclass=ABCMeta):
                         class_weights = tf.convert_to_tensor(class_weight_arr)
 
                     with tf.variable_scope('model/target'):
-                        config = {
+                        target_model_config = {
                             'featurizer_state': featurizer_state,
                             'targets': Y,
                             'n_outputs': target_dim,
@@ -569,8 +569,8 @@ class BaseModel(object, metaclass=ABCMeta):
                             'max_length': self.config.max_length
                         }
                         if self.config.class_weights:
-                            config['class_weights'] = class_weights
-                        target_model_state = self._target_model(**config)
+                            target_model_config['class_weights'] = class_weights
+                        target_model_state = self._target_model(**target_model_config)
                     train_loss += (1 - lm_loss_coef) * tf.reduce_mean(target_model_state['losses'])
                     train_loss_tower += train_loss
 
