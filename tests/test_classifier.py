@@ -132,17 +132,16 @@ class TestClassifier(unittest.TestCase):
         new_recall = recall_score(valid_sample.Target.values, predictions, pos_label=1)
         self.assertTrue(new_recall >= recall)
 
-
     def test_fit_predict_batch_size_1(self):
         """
         Ensure training is possible with batch size of 1
         """
-        model = Classifier(config=self.default_config(batch_size=1))
+        model = Classifier(config=self.default_config())
+        model.config.batch_size = 1
         train_sample = self.dataset.sample(n=self.n_sample)
         valid_sample = self.dataset.sample(n=self.n_sample)
         model.fit(train_sample.Text.values, train_sample.Target.values)
         model.predict(valid_sample.Text.values)
-
 
     def test_save_load(self):
         """
