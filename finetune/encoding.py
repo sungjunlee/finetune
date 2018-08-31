@@ -80,9 +80,9 @@ class TextEncoder(object):
     """
     UNK_IDX = 0
 
-    def __init__(self):
+    def __init__(self, encoder_path=ENCODER_PATH, bpe_path=BPE_PATH):
         self.nlp = NLP
-        self.encoder = json.load(open(ENCODER_PATH))
+        self.encoder = json.load(open(encoder_path))
         self.decoder = {v: k for k, v in self.encoder.items()}
 
         self.special_tokens = ['_start_', '_delimiter_', '_classify_']
@@ -91,7 +91,7 @@ class TextEncoder(object):
 
         self.decoder = {v: k for k, v in self.encoder.items()}
 
-        merges = codecs.open(BPE_PATH, encoding='utf8').read().split('\n')[1:-1]
+        merges = codecs.open(bpe_path, encoding='utf8').read().split('\n')[1:-1]
         merges = [tuple(merge.split()) for merge in merges]
         self.bpe_ranks = dict(zip(merges, range(len(merges))))
         self.cache = {}

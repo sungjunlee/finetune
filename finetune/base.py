@@ -66,7 +66,7 @@ class BaseModel(object, metaclass=ABCMeta):
         self._set_random_seed(self.config.seed)
 
         download_data_if_required()
-        self.encoder = TextEncoder()
+        self.encoder = TextEncoder(self.config.encoder_path, self.config.bpe_path)
 
         # symbolic ops
         self.logits = None  # classification logits
@@ -244,7 +244,9 @@ class BaseModel(object, metaclass=ABCMeta):
         self.is_trained = True
 
         avg_train_loss = None
+        avg_train_lm_loss = None
         avg_val_loss = None
+        avg_val_lm_loss = None
         global_step = 0
         best_val_loss = float("inf")
         val_window = [float("inf")] * self.config.val_window_size
@@ -273,6 +275,7 @@ class BaseModel(object, metaclass=ABCMeta):
                         self.train_writer.add_summary(outputs.get(self.summaries), global_step)
 
                     sum_val_loss = 0
+                    sum_val_lm_loss = 0
                     for xval, mval, yval in iter_data(*val_dataset, n_batch=n_batch_train, verbose=self.config.verbose,
                                                       tqdm_desc="Validation"):
                         feed_dict = {
@@ -288,14 +291,21 @@ class BaseModel(object, metaclass=ABCMeta):
                             self.valid_writer.add_summary(outputs.get(self.summaries), global_step)
 
                         val_cost = outputs.get(self.target_loss, 0)
+                        val_lm_cost = outputs.get(self.lm_loss, 0)
                         sum_val_loss += val_cost
+                        sum_val_lm_loss += val_lm_cost
 
                         if avg_val_loss is None:
                             avg_val_loss = val_cost
+                            avg_val_lm_loss = val_lm_cost
                         else:
                             avg_val_loss = (
                                     avg_val_loss * self.config.rolling_avg_decay
                                     + val_cost * (1 - self.config.rolling_avg_decay)
+                            )
+                            avg_val_lm_loss = (
+                                    avg_val_lm_loss * self.config.rolling_avg_decay
+                                    + val_lm_cost * (1 - self.config.rolling_avg_decay)
                             )
                     val_window.append(sum_val_loss)
                     val_window.pop(0)
@@ -305,16 +315,22 @@ class BaseModel(object, metaclass=ABCMeta):
                         if self.config.autosave_path is not None:
                             self.save(self.config.autosave_path)
 
-                    tqdm.tqdm.write("Train loss: {}\t Validation loss: {}".format(avg_train_loss, avg_val_loss))
+                    tqdm.tqdm.write(
+                        "Train loss: {}\t Validation loss: {}\t Train loss(lm): {}\t Validation loss(lm): {}".format(
+                            avg_train_loss, avg_val_loss, avg_train_lm_loss, avg_val_lm_loss))
 
                 feed_dict[self.do_dropout] = DROPOUT_ON
                 outputs = self._eval(self.target_loss, self.train_op, feed_dict=feed_dict)
 
                 cost = outputs.get(self.target_loss, 0)
+                lm_cost = outputs.get(self.lm_loss, 0)
                 if avg_train_loss is None:
                     avg_train_loss = cost
+                    avg_train_lm_loss = lm_cost
                 else:
                     avg_train_loss = avg_train_loss * self.config.rolling_avg_decay + cost * (
+                            1 - self.config.rolling_avg_decay)
+                    avg_train_lm_loss = avg_train_lm_loss * self.config.rolling_avg_decay + lm_cost * (
                             1 - self.config.rolling_avg_decay)
 
         return self
@@ -611,7 +627,7 @@ class BaseModel(object, metaclass=ABCMeta):
             self._construct_graph(n_updates_total, target_dim, train=train)
 
         self._initialize_session()
-        self.saver.initialize(self.sess)
+        self.saver.initialize(self.sess, expect_new_variables=self.config.expect_new_variables)
 
         self.target_dim = target_dim
         if train:

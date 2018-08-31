@@ -153,12 +153,15 @@ def get_default_config():
         save_adam_vars=False,
         num_layers_trained=12,
         train_embeddings=True,
+        expect_new_variables=True,
 
         # Must remain fixed
         n_heads=12,
         n_layer=12,
         act_fn="gelu",
         n_embed=768,
+        encoder_path = os.path.join(os.path.dirname(__file__), 'model/encoder_bpe_40000.json'),
+        bpe_path = os.path.join(os.path.dirname(__file__), 'model/vocab_40000.bpe'),
         base_model_path=os.path.join(os.path.dirname(__file__), "model", "Base_model.jl")
     )
 

@@ -71,7 +71,10 @@ class Saver:
         :param expect_new_variables:
         :return:
         """
-        variables_fb = joblib.load(self.fallback_filename)
+        if self.fallback_filename is not None and os.path.exists(self.fallback_filename):
+            variables_fb = joblib.load(self.fallback_filename)
+        else:
+            variables_fb = dict()
 
         if self.variables is not None:
             variables_sv = self.variables
@@ -106,7 +109,10 @@ class Saver:
         self.variables = None # not an explicit del but should set reference count to 0 unless being used for deviation regularisation
 
     def get_pretrained_weights(self):
-        return joblib.load(self.fallback_filename)
+        if self.fallback_filename is not None and os.path.exists(self.fallback_filename):
+            return joblib.load(self.fallback_filename)
+        else:
+            return dict()
 
     def remove_unchanged(self, variables, variable_values, fallback_vars):
         skips = []
