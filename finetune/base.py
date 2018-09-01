@@ -72,6 +72,7 @@ class BaseModel(object, metaclass=ABCMeta):
         self.logits = None  # classification logits
         self.target_loss = None  # cross-entropy loss
         self.lm_losses = None  # language modeling losses
+        self.lm_loss = None  # language modeling losses
         self.lm_predict_op = None
         self.train = None  # gradient + parameter update
         self.features = None  # hidden representation fed to classifier
@@ -195,7 +196,7 @@ class BaseModel(object, metaclass=ABCMeta):
         }
 
     def finetune(self, Xs, Y=None, batch_size=None):
-        if len(Xs) != len(Y):
+        if Y is not None and len(Xs) != len(Y):
             raise FinetuneError(
                 "Mismatch between number of examples ({}) and number of targets ({}) provided.".format(
                     len(Xs),
@@ -286,7 +287,7 @@ class BaseModel(object, metaclass=ABCMeta):
                         if target_dim:
                             feed_dict[self.Y] = yval
 
-                        outputs = self._eval(self.target_loss, self.summaries, feed_dict=feed_dict)
+                        outputs = self._eval(self.target_loss, self.lm_loss, self.summaries, feed_dict=feed_dict)
                         if self.valid_writer is not None:
                             self.valid_writer.add_summary(outputs.get(self.summaries), global_step)
 
@@ -320,7 +321,8 @@ class BaseModel(object, metaclass=ABCMeta):
                             avg_train_loss, avg_val_loss, avg_train_lm_loss, avg_val_lm_loss))
 
                 feed_dict[self.do_dropout] = DROPOUT_ON
-                outputs = self._eval(self.target_loss, self.train_op, feed_dict=feed_dict)
+                outputs = self._eval(self.target_loss, self.lm_loss, self.train_op,
+                        feed_dict=feed_dict)
 
                 cost = outputs.get(self.target_loss, 0)
                 lm_cost = outputs.get(self.lm_loss, 0)
@@ -641,9 +643,10 @@ class BaseModel(object, metaclass=ABCMeta):
     def _initialize_session(self):
         if self.sess is None:
             gpus = self.config.visible_gpus
-            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join([str(gpu) for gpu in gpus])
+#            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join([str(gpu) for gpu ijkjn gpus])
             conf = tf.ConfigProto(allow_soft_placement=self.config.soft_device_placement,
                                   log_device_placement=self.config.log_device_placement)
+            conf.gpu_options.allow_growth = True
             self.sess = tf.Session(config=conf)
 
     def _set_random_seed(self, seed=None):
